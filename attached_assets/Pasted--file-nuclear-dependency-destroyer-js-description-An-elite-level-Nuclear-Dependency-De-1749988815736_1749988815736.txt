@@ -1,0 +1,244 @@
+/**
+ * @file nuclear-dependency-destroyer.js
+ * @description An elite-level "Nuclear Dependency Destroyer" designed to eradicate
+ * stubborn `node_modules` directories, package caches, and process locks that cause
+ * persistent `npm` installation failures and "module not found" errors.
+ * This script is intended to be run when standard cleanup methods fail.
+ * It uses the `elite-command-executor.js` for robust shell operations.
+ *
+ * This version is modified to be callable as a module, not immediately exit the process.
+ */
+
+const fs = require('fs').promises;
+const path = require('path');
+// Ensure elite-command-executor is found relative to this script's directory
+const { executeCommand } = require(path.join(__dirname, 'elite-command-executor'));
+
+// --- Configuration ---
+const CONFIG = {
+    PROJECT_ROOT: process.cwd(),
+    NPM_COMMAND: 'npm',
+    YARN_COMMAND: 'yarn',
+    TIMEOUT_MS_PER_COMMAND: 180000, // 3 minutes per command
+    CLEANUP_PATHS: [
+        'node_modules',
+        'package-lock.json',
+        'yarn.lock',
+        // Common npm cache directory in user's home (need to handle correctly)
+        // '.npm',
+        // Common yarn cache directory in user's home (need to handle correctly)
+        // '.yarn',
+        // Add more paths if specific build artifacts or temporary directories cause issues
+    ],
+    CRITICAL_PACKAGES_TO_REINSTALL: ['express'], // Reinstall Express to ensure it's there
+};
+
+// --- Helper Functions ---
+
+/**
+ * Executes a command with robust error handling and logging.
+ * @param {string} command - The command string.
+ * @param {string[]} args - Arguments for the command.
+ * @param {string} description - A user-friendly description of the command.
+ * @param {Object} [options={}] - Options for executeCommand.
+ * @returns {Promise<boolean>} True if successful, false otherwise.
+ */
+async function runSafeCommand(command, args, description, options = {}) {
+    console.log(`\nAttempting: ${description}...`);
+    const result = await executeCommand(command, args, {
+        cwd: CONFIG.PROJECT_ROOT,
+        timeout: CONFIG.TIMEOUT_MS_PER_COMMAND,
+        retries: 2, // Allow some retries for critical commands
+        ...options
+    });
+
+    if (result.success) {
+        console.log(`${description} SUCCEEDED.`);
+        return true;
+    } else {
+        console.error(`${description} FAILED.`);
+        console.error(`Error details: ${result.stderr || result.message}`);
+        console.error(`Full output: ${result.stdout}`);
+        return false;
+    }
+}
+
+/**
+ * Attempts to kill processes potentially locking directories.
+ * This is highly platform-dependent and might require elevated privileges.
+ */
+async function killLockingProcesses() {
+    console.log('\n--- Attempting to Kill Potentially Locking Processes ---');
+    let success = true;
+
+    if (process.platform === 'win32') {
+        console.log('On Windows, use Task Manager or `taskkill /IM node.exe /F` if processes are stuck.');
+        console.log('Attempting to kill known Node.js processes, might require admin privileges...');
+        // Note: Taskkill with /F (force) and /T (tree kill) can be very aggressive.
+        // It's hard to target specific locks without PIDs.
+        const killNodeResult = await executeCommand('taskkill', ['/IM', 'node.exe', '/F', '/T'], 'Kill all Node.js processes', { silent: true, retries: 0 });
+        if (!killNodeResult.success && !killNodeResult.stderr.includes('not found')) {
+            console.warn(`Could not force kill Node.js processes. Manual intervention (Task Manager) might be required. Error: ${killNodeResult.stderr}`);
+            success = false;
+        }
+    } else { // Linux/macOS
+        console.log('On Linux/macOS, attempting to kill node and npm processes...');
+        // Use pkill or killall for a more general approach
+        const killNodeResult = await executeCommand('pkill', ['-9', 'node'], 'Kill Node processes', { silent: true, retries: 0 });
+        if (!killNodeResult.success && !killNodeResult.stderr.includes('no process found')) {
+            console.warn(`Could not force kill Node processes. Manual intervention (e.g., 'killall -9 node') might be required. Error: ${killNodeResult.stderr}`);
+            success = false;
+        }
+        const killNpmResult = await executeCommand('pkill', ['-9', 'npm'], 'Kill NPM processes', { silent: true, retries: 0 });
+        if (!killNpmResult.success && !killNpmResult.stderr.includes('no process found')) {
+            console.warn(`Could not force kill NPM processes. Manual intervention might be required. Error: ${killNpmResult.stderr}`);
+            success = false;
+        }
+    }
+
+    if (success) {
+        console.log('Attempted to kill locking processes. Giving a moment for cleanup...');
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+    }
+    return success;
+}
+
+/**
+ * Attempts to fix permissions for a given path.
+ * This is primarily for Linux/macOS systems where EACCES errors are common.
+ * @param {string} targetPath - The path to fix permissions for.
+ * @returns {Promise<boolean>} True if successful or not applicable, false if failed.
+ */
+async function fixPermissions(targetPath) {
+    if (process.platform === 'win32') {
+        console.log(`Skipping permission fix for Windows path: ${targetPath}. Manual adjustment of ACLs might be needed.`);
+        return true;
+    }
+    console.log(`Attempting to fix permissions for ${targetPath}...`);
+    const currentUser = process.env.USER || process.env.LOGNAME || 'unknown_user';
+    // Change ownership to current user recursively
+    let success = await runSafeCommand('sudo', ['chown', '-R', `${currentUser}:${currentUser}`, targetPath], `Change ownership of ${targetPath}`);
+    if (success) {
+        // Grant read/write permissions to owner recursively
+        success = await runSafeCommand('sudo', ['chmod', '-R', 'u+rw', targetPath], `Grant R/W permissions to ${targetPath}`);
+    }
+    return success;
+}
+
+/**
+ * Deletes a file or directory forcefully.
+ * Handles both Windows and Unix-like systems.
+ * @param {string} targetPath - The path to delete.
+ * @returns {Promise<boolean>} True if deletion was successful or path didn't exist, false otherwise.
+ */
+async function deletePathForcefully(targetPath) {
+    const fullPath = path.join(CONFIG.PROJECT_ROOT, targetPath);
+    console.log(`Attempting to delete: ${fullPath}`);
+
+    try {
+        await fs.access(fullPath); // Check if it exists
+    } catch (error) {
+        console.log(`Path does not exist: ${fullPath}. Skipping deletion.`);
+        return true;
+    }
+
+    // Try fixing permissions before deleting
+    await fixPermissions(fullPath);
+
+    if (process.platform === 'win32') {
+        // Use rmdir /s /q for directories, del /f /q for files on Windows
+        const stats = await fs.stat(fullPath);
+        if (stats.isDirectory()) {
+            return await runSafeCommand('rmdir', ['/s', '/q', fullPath], `Delete directory ${targetPath} (Windows)`);
+        } else {
+            return await runSafeCommand('del', ['/f', '/q', fullPath], `Delete file ${targetPath} (Windows)`);
+        }
+    } else {
+        // Use rm -rf for Unix-like systems
+        return await runSafeCommand('rm', ['-rf', fullPath], `Delete ${targetPath} (Unix/Linux)`);
+    }
+}
+
+/**
+ * Main function to destroy and then optionally reinstall dependencies.
+ * @returns {Promise<boolean>} True if the process completed successfully, false otherwise.
+ */
+async function nuclearDependencyDestroyerMain() {
+    console.log(`\n💥 Initiating Nuclear Dependency Destroyer in ${CONFIG.PROJECT_ROOT} 💥`);
+    const startTime = Date.now();
+    let overallSuccess = true;
+
+    try {
+        // Step 1: Kill processes that might be holding locks
+        await killLockingProcesses();
+
+        // Step 2: Forcefully delete problematic directories and files
+        for (const p of CONFIG.CLEANUP_PATHS) {
+            // Handle home directory paths like '.npm' if needed, though for node_modules
+            // it's usually relative to project root. Keeping it simple for now.
+            if (!(await deletePathForcefully(p))) {
+                console.warn(`Failed to delete ${p}. This might indicate persistent locks.`);
+                // We'll try to proceed, but flag a potential issue
+            }
+        }
+
+        // Step 3: Clear package manager caches
+        console.log('\n--- Clearing Package Manager Caches ---');
+        let npmCacheCleared = await runSafeCommand(CONFIG.NPM_COMMAND, ['cache', 'clean', '--force'], 'Clear npm cache');
+        // If npm cache failed, try fixing permissions on global npm cache
+        if (!npmCacheCleared && process.platform !== 'win32') {
+            const npmCachePathResult = await executeCommand(CONFIG.NPM_COMMAND, ['config', 'get', 'cache'], { silent: true });
+            if (npmCachePathResult.success) {
+                await fixPermissions(npmCachePathResult.stdout.trim());
+                await runSafeCommand(CONFIG.NPM_COMMAND, ['cache', 'clean', '--force'], 'Clear npm cache (retry after perm fix)');
+            }
+        }
+
+        // Detect package manager for yarn cache
+        const packageManager = await (async () => {
+            if (await executeCommand(CONFIG.YARN_COMMAND, ['--version'], { silent: true, timeout: 5000 }).then(r => r.success)) {
+                return CONFIG.YARN_COMMAND;
+            }
+            return CONFIG.NPM_COMMAND;
+        })();
+        if (packageManager === CONFIG.YARN_COMMAND) {
+            await runSafeCommand(CONFIG.YARN_COMMAND, ['cache', 'clean'], 'Clear yarn cache');
+        }
+
+        // Step 4: Reinstall critical packages (like Express)
+        console.log('\n--- Reinstalling Critical Packages ---');
+        for (const pkg of CONFIG.CRITICAL_PACKAGES_TO_REINSTALL) {
+            if (!(await runSafeCommand(packageManager, ['install', pkg], `Install ${pkg}`))) {
+                console.error(`Critical package ${pkg} failed to reinstall.`);
+                overallSuccess = false;
+            }
+        }
+
+        // Step 5: Final full installation attempt
+        console.log('\n--- Attempting Full Dependency Reinstallation ---');
+        if (!(await runSafeCommand(packageManager, ['install'], 'Full dependency installation'))) {
+            console.error('Final full dependency installation failed.');
+            overallSuccess = false;
+        }
+
+
+    } catch (error) {
+        console.error('\n!!! A catastrophic error occurred during nuclear dependency destruction !!!');
+        console.error('Error details:', error.message);
+        overallSuccess = false;
+    } finally {
+        const endTime = Date.now();
+        const duration = ((endTime - startTime) / 1000 / 60).toFixed(2);
+        console.log(`\n--- Nuclear Dependency Destroyer ${overallSuccess ? 'COMPLETED SUCCESSFULLY' : 'COMPLETED WITH ISSUES'} ---`);
+        console.log(`Total duration: ${duration} minutes.`);
+        if (!overallSuccess) {
+            console.log('Review the logs above. Manual intervention or a system reboot might be required.');
+        }
+        console.log('💥 Dependency Destruction Process Finished 💥');
+    }
+    return overallSuccess;
+}
+
+module.exports = {
+    nuclearDependencyDestroyerMain // Export the main function
+};

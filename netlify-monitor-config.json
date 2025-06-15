@@ -1,0 +1,7 @@
+{
+  "netlify_site_id": "502e465d-e030-4d5e-9ef9-31ec93a2308d",
+  "auto_deploy": true,
+  "monitor_interval": 30000,
+  "health_checks": true,
+  "created": "2025-06-14T14:40:32.776Z"
+}

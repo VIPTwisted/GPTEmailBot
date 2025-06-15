@@ -1,0 +1,120 @@
+🧬 TOYPARTY SYSTEM: FULL LIVE CONTROL OVERVIEW
+🌐 1. PUBLIC WEBSITE (FRONTEND)
+🔗 Live URL: https://toyparty.netlify.app
+✅ Hosted on Netlify
+✅ Auto-updates on every GPT commit
+✅ Fully responsive, SEO-ready
+✅ Product grid, hero, banners, footer, nav — all dynamic from Builder.io
+
+🧠 2. BUILDER.IO CMS (LIVE EDIT)
+🔗 https://builder.io
+Login Email: sinphoriastudio@gmail.com (or whichever you registered)
+🔑 Password: admin123 (if password gate was applied)
+
+✅ Sections editable:
+
+Header / footer
+
+Hero section
+
+Product blocks
+
+Banners
+
+Gift box builder
+
+Quiz pages
+
+🛠 Edits instantly sync → GitHub → Netlify
+
+🖥 3. ADMIN DASHBOARD (LOCAL VIA REPLIT)
+Replit Project: gpt-github-sync
+Login at: https://replit.com/@jodisims1970/gpt-github-sync
+🔑 Admin Password: admin123
+Files:
+
+/admin/Dashboard.jsx — Master control panel
+
+/admin/DeployMonitor.jsx — Watch Netlify + GitHub sync
+
+/admin/AuditViewer.jsx — See GPT push logs
+
+/admin/GPTOverridePanel.jsx — Inject code + auto-push manually
+
+✅ Use this to:
+
+Push hotfixes
+
+Rollback pushes
+
+Approve GPT-pending updates
+
+🧾 4. DATABASE (NEON PostgreSQL)
+🔗 https://neon.tech
+Project: ToyParty
+🔑 Use your Neon login to access
+📂 Env Var: DATABASE_URL already injected into Netlify
+
+Used for:
+
+CRM data
+
+User accounts
+
+Quiz results
+
+Orders / checkout (coming phase 2)
+
+Rep tracking
+
+🧠 5. GITHUB (CODE + HISTORY + CONTROL)
+🔗 https://github.com/VIPTwisted/GPTToyParty
+✅ GPT commits every update
+✅ All logs tracked in:
+
+/logs/audit-log.md — All deploys, file pushes
+
+/logs/ownership.md — Brand control + clone record
+
+🧰 6. REPLIT (DEPLOYMENT BRIDGE + GPT ENGINE)
+🔗 https://replit.com/@jodisims1970/gpt-github-sync
+✅ Contains:
+
+sync-gpt-to-github.js — Auto push engine
+
+clone-site.js — Spin-off deployment script
+
+.git is connected to GitHub
+
+GPT has full write access and version control
+
+🔑 7. MASTER CREDENTIALS SUMMARY
+Tool	Login/Access	Notes
+Public Site	https://toyparty.netlify.app	Live, hosted, SEO-ready
+Builder.io	Your Builder login	CMS + content editing
+Admin Panel	admin123	Local or Replit gated UI
+Netlify	https://app.netlify.com	Site settings, deploy logs
+GitHub	https://github.com/VIPTwisted	Code, commits, audit
+Replit	https://replit.com/@jodisims1970	Sync engine, admin scripts
+Neon DB	https://neon.tech	Database control + env key
+
+🛡️ SYSTEM STATUS: FORTIFIED
+Feature	Status
+Auto deploy	✅
+Logs + tracking	✅
+Admin override	✅
+GPT cloning engine	✅
+Backup + rebuild	✅
+Fully live + scalable	✅
+
+🧭 NEXT ACTIONS (SAY THE WORD TO BEGIN)
+“Launch affiliate system” — MLM dashboard, referrals, link tracking
+
+“Launch gift box builder” — Custom bundle builder with GPT-generated gift logic
+
+“Start AI content system” — Trend pages, TikTok post writer, blog generator
+
+“Add multilingual system” — Auto-create Spanish, French, etc. from Builder
+
+“Launch CRM dashboard” — Full user + lead tracking
+

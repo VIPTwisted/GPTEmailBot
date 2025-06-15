@@ -1,0 +1,13 @@
+{
+  "environment": "production",
+  "version": "2.0",
+  "buildTime": "2025-06-15T11:58:51.393Z",
+  "features": {
+    "dashboards": true,
+    "monitoring": true,
+    "analytics": true,
+    "ai": true,
+    "seo": true,
+    "commerce": true
+  }
+}

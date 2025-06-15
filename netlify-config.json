@@ -1,0 +1,19 @@
+{
+  "service": "Netlify",
+  "version": "2.0",
+  "fixed_at": "2025-06-14T13:39:12.533Z",
+  "secrets_required": {
+    "NETLIFY_SITE_ID": "502e465d-e030-4d5e-9ef9-31ec93a2308d",
+    "NETLIFY_ACCESS_TOKEN": "FOUND"
+  },
+  "api_endpoints": {
+    "base": "https://api.netlify.com/api/v1",
+    "site": "/sites/502e465d-e030-4d5e-9ef9-31ec93a2308d",
+    "builds": "/sites/502e465d-e030-4d5e-9ef9-31ec93a2308d/builds"
+  },
+  "validation": {
+    "connection_tested": false,
+    "build_trigger_tested": false,
+    "last_test": null
+  }
+}

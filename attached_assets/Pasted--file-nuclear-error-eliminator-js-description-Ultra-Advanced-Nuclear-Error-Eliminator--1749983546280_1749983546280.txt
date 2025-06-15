@@ -1,0 +1,393 @@
+/**
+ * @file nuclear-error-eliminator.js
+ * @description Ultra-Advanced Nuclear Error Eliminator.
+ * This script is designed to diagnose and fix a wide range of common
+ * JavaScript project errors, focusing on npm package installation issues,
+ * missing dependencies, and shell command execution failures.
+ * It leverages a robust `elite-command-executor` for reliable shell operations.
+ * It aims to be an "elite-level" solution for persistent development environment problems.
+ */
+
+const fs = require('fs').promises;
+const path = require('path');
+const { executeCommand } = require('./elite-command-executor'); // Import the elite executor
+
+// --- Configuration ---
+const CONFIG = {
+    PROJECT_ROOT: process.cwd(),
+    NPM_COMMAND: 'npm',
+    YARN_COMMAND: 'yarn',
+    MAX_CLEANUP_RETRIES: 3,
+    MAX_INSTALL_ATTEMPTS: 5, // Includes initial attempt + retries
+    INSTALL_RETRY_DELAY_MS: 5000, // 5 seconds
+    TIMEOUT_MS_PER_COMMAND: 300000, // 5 minutes per command
+    GLOBAL_TIMEOUT_MS: 3600000, // 1 hour for the entire elimination process
+    REQUIRED_GLOBAL_PACKAGES: [], // Add if any global packages are strictly needed
+    CRITICAL_PACKAGES_TO_ENSURE: ['express'], // Ensure Express is always installed
+    COMMON_ERROR_PATTERNS: [
+        /EACCES/i, // Permission denied
+        /ENOENT/i, // No such file or directory
+        /ETIMEDOUT/i, // Connection timeout
+        /ERR_OSSL_EVP_UNSUPPORTED/i, // OpenSSL error (often solved by update/reinstall)
+        /g++: fatal error: no such file or directory/i, // Build tools missing
+        /node-gyp/i, // Node-gyp build issues
+        /npm ERR! code ELIFECYCLE/i, // Script lifecycle errors
+        /npm ERR! Error: EPERM/i, // Operation not permitted
+        /spawnsync/i, // Command execution issues (addressed by executor, but good to detect)
+        /404 Not Found/i, // Package not found
+        /certificate has expired/i, // SSL certificate issues
+        /corrupted cache/i, // NPM cache corruption
+    ]
+};
+
+// --- Helper Functions ---
+
+/**
+ * Checks if a command exists in the system's PATH.
+ * @param {string} command - The command to check (e.g., 'npm').
+ * @returns {Promise<boolean>} True if the command exists, false otherwise.
+ */
+async function commandExists(command) {
+    const checkCommand = process.platform === 'win32' ? `where ${command}` : `command -v ${command}`;
+    const result = await executeCommand(checkCommand, [], { silent: true, timeout: 5000 });
+    return result.success;
+}
+
+/**
+ * Detects the preferred package manager (npm or yarn).
+ * @returns {Promise<string>} 'npm' or 'yarn', defaults to 'npm' if yarn not found.
+ */
+async function detectPackageManager() {
+    console.log('Detecting package manager...');
+    if (await commandExists(CONFIG.YARN_COMMAND)) {
+        try {
+            const { stdout } = await executeCommand(CONFIG.YARN_COMMAND, ['--version'], { silent: true, timeout: 5000 });
+            if (stdout.includes('.')) { // Simple check for version number
+                console.log('Yarn detected.');
+                return CONFIG.YARN_COMMAND;
+            }
+        } catch (e) {
+            console.warn('Yarn detected but failed version check. Falling back to npm.', e.message);
+        }
+    }
+    console.log('Using npm as package manager.');
+    return CONFIG.NPM_COMMAND;
+}
+
+/**
+ * Cleans up common npm and project related artifacts.
+ * @param {string} packageManager - 'npm' or 'yarn'.
+ * @returns {Promise<boolean>} True if cleanup was successful, false otherwise.
+ */
+async function performDeepCleanup(packageManager) {
+    console.log('\n--- Initiating Deep Cleanup ---');
+    let success = true;
+
+    const cleanupSteps = [
+        { desc: 'Removing node_modules', cmd: 'rm -rf', args: ['node_modules'], optional: true },
+        { desc: 'Removing package-lock.json', cmd: 'rm -f', args: ['package-lock.json'], optional: true },
+        { desc: 'Removing yarn.lock', cmd: 'rm -f', args: ['yarn.lock'], optional: true },
+        { desc: 'Clearing npm cache', cmd: CONFIG.NPM_COMMAND, args: ['cache', 'clean', '--force'], optional: false },
+        { desc: 'Clearing yarn cache', cmd: CONFIG.YARN_COMMAND, args: ['cache', 'clean'], optional: true, condition: packageManager === CONFIG.YARN_COMMAND },
+        { desc: 'Attempting to fix npm global permissions', cmd: CONFIG.NPM_COMMAND, args: ['config', 'set', 'unsafe-perm', 'true'], optional: true },
+        { desc: 'Verifying npm cache integrity', cmd: CONFIG.NPM_COMMAND, args: ['cache', 'verify'], optional: false },
+    ];
+
+    // Platform-specific commands for Windows
+    if (process.platform === 'win32') {
+        cleanupSteps[0] = { desc: 'Removing node_modules (Windows)', cmd: 'rmdir /s /q', args: ['node_modules'], optional: true };
+        cleanupSteps[1] = { desc: 'Removing package-lock.json (Windows)', cmd: 'del /f', args: ['package-lock.json'], optional: true };
+        cleanupSteps[2] = { desc: 'Removing yarn.lock (Windows)', cmd: 'del /f', args: ['yarn.lock'], optional: true };
+    }
+
+    for (const step of cleanupSteps) {
+        if (step.condition !== undefined && !step.condition) {
+            continue; // Skip if condition not met
+        }
+        console.log(`- ${step.desc}...`);
+        const { success: stepSuccess, stderr } = await executeCommand(step.cmd, step.args, {
+            cwd: CONFIG.PROJECT_ROOT,
+            timeout: CONFIG.TIMEOUT_MS_PER_COMMAND,
+            retries: 1 // Only one retry for cleanup steps, as they are destructive
+        });
+
+        if (!stepSuccess) {
+            console.warn(`  ${step.desc} failed: ${stderr.trim()}`);
+            if (!step.optional) {
+                success = false; // Mark overall cleanup as failed if a critical step fails
+            }
+        } else {
+            console.log(`  ${step.desc} completed.`);
+        }
+    }
+
+    if (success) {
+        console.log('Deep cleanup completed successfully.');
+    } else {
+        console.warn('Deep cleanup completed with some failures. Proceeding with caution.');
+    }
+    return success;
+}
+
+/**
+ * Attempts to install project dependencies.
+ * @param {string} packageManager - 'npm' or 'yarn'.
+ * @returns {Promise<boolean>} True if installation was successful, false otherwise.
+ */
+async function installDependencies(packageManager) {
+    console.log('\n--- Attempting to Install Dependencies ---');
+    let installSuccess = false;
+    let attempts = 0;
+
+    while (!installSuccess && attempts < CONFIG.MAX_INSTALL_ATTEMPTS) {
+        attempts++;
+        console.log(`\nInstallation attempt ${attempts}/${CONFIG.MAX_INSTALL_ATTEMPTS} using ${packageManager}...`);
+
+        let commandArgs = ['install'];
+        if (packageManager === CONFIG.NPM_COMMAND) {
+            commandArgs.push('--legacy-peer-deps'); // Often helps resolve peer dependency conflicts
+        }
+
+        const result = await executeCommand(packageManager, commandArgs, {
+            cwd: CONFIG.PROJECT_ROOT,
+            timeout: CONFIG.TIMEOUT_MS_PER_COMMAND,
+            retries: 0 // Retries are handled by the outer loop
+        });
+
+        if (result.success) {
+            installSuccess = true;
+            console.log('Dependencies installed successfully!');
+        } else {
+            console.error(`Dependency installation failed. Attempt ${attempts} of ${CONFIG.MAX_INSTALL_ATTEMPTS}.`);
+            console.error('Error Output:\n', result.stderr);
+
+            // Diagnose common error patterns
+            let foundPattern = false;
+            for (const pattern of CONFIG.COMMON_ERROR_PATTERNS) {
+                if (result.stderr.match(pattern)) {
+                    console.error(`Detected common error pattern: ${pattern.source}.`);
+                    foundPattern = true;
+                    // Implement specific recovery for patterns if needed
+                    break;
+                }
+            }
+
+            if (!foundPattern) {
+                console.warn('No specific common error pattern detected. This might be a new issue or complex interaction.');
+            }
+
+            if (attempts < CONFIG.MAX_INSTALL_ATTEMPTS) {
+                console.log(`Retrying installation in ${CONFIG.INSTALL_RETRY_DELAY_MS / 1000} seconds...`);
+                await delay(CONFIG.INSTALL_RETRY_DELAY_MS);
+            }
+        }
+    }
+    return installSuccess;
+}
+
+/**
+ * Ensures critical packages are installed, even if the main installation fails.
+ * @param {string} packageManager - 'npm' or 'yarn'.
+ * @param {string[]} packages - Array of package names to ensure.
+ * @returns {Promise<boolean>} True if all critical packages were ensured, false otherwise.
+ */
+async function ensureCriticalPackages(packageManager, packages) {
+    console.log('\n--- Ensuring Critical Packages Are Installed ---');
+    let allCriticalPackagesInstalled = true;
+
+    for (const pkg of packages) {
+        console.log(`Checking and installing critical package: ${pkg}...`);
+        const checkCommand = packageManager === CONFIG.NPM_COMMAND ? 'ls' : 'list';
+        const checkArgs = packageManager === CONFIG.NPM_COMMAND ? ['-g', pkg] : [pkg]; // Use -g to check global presence, but install locally
+
+        // First, check if the package is already there locally
+        const localCheckResult = await executeCommand(packageManager, ['list', pkg, '--depth=0'], {
+            cwd: CONFIG.PROJECT_ROOT,
+            silent: true,
+            timeout: 10000
+        });
+
+        if (localCheckResult.success && localCheckResult.stdout.includes(pkg)) {
+            console.log(`Package "${pkg}" already present locally.`);
+            continue;
+        }
+
+        console.log(`Package "${pkg}" not found locally. Attempting to install...`);
+        const installResult = await executeCommand(packageManager, ['install', pkg], {
+            cwd: CONFIG.PROJECT_ROOT,
+            timeout: CONFIG.TIMEOUT_MS_PER_COMMAND,
+            retries: 3 // Allow retries for individual critical package installs
+        });
+
+        if (installResult.success) {
+            console.log(`Successfully installed critical package: ${pkg}`);
+        } else {
+            console.error(`Failed to install critical package: ${pkg}. Error: ${installResult.stderr}`);
+            allCriticalPackagesInstalled = false;
+        }
+    }
+    return allCriticalPackagesInstalled;
+}
+
+/**
+ * Checks for and potentially fixes common permission issues by adjusting ownership.
+ * NOTE: This is a powerful command and should be used with caution.
+ * It's primarily for Linux/macOS.
+ * @param {string} targetPath - The path to fix permissions for.
+ * @returns {Promise<boolean>} True if permissions seem fine or were fixed, false if persistent issues.
+ */
+async function fixPermissions(targetPath) {
+    if (process.platform === 'win32') {
+        console.log('Skipping permission fix for Windows. Manual intervention might be needed for ACL issues.');
+        return true;
+    }
+
+    console.log(`\n--- Attempting to Fix Permissions for ${targetPath} ---`);
+    const currentUser = process.env.USER || process.env.LOGNAME;
+    if (!currentUser) {
+        console.warn('Could not determine current user. Skipping permission fix.');
+        return false;
+    }
+
+    // Try to change ownership recursively
+    console.log(`Attempting to set ownership of ${targetPath} to ${currentUser}...`);
+    const chownResult = await executeCommand('sudo', ['chown', '-R', `${currentUser}:${currentUser}`, targetPath], {
+        cwd: CONFIG.PROJECT_ROOT,
+        timeout: 30000,
+        retries: 1 // No retries for sudo commands typically
+    });
+
+    if (chownResult.success) {
+        console.log('Ownership updated successfully. Applying chmod for write access...');
+        // Also ensure write permissions
+        const chmodResult = await executeCommand('sudo', ['chmod', '-R', 'u+rw', targetPath], {
+            cwd: CONFIG.PROJECT_ROOT,
+            timeout: 30000,
+            retries: 1
+        });
+        if (chmodResult.success) {
+            console.log('Permissions updated successfully.');
+            return true;
+        } else {
+            console.error(`Failed to apply write permissions: ${chmodResult.stderr}`);
+            return false;
+        }
+    } else {
+        console.warn(`Failed to change ownership: ${chownResult.stderr}. You may need to manually run 'sudo chown -R ${currentUser}:${currentUser} ${targetPath}'`);
+        return false;
+    }
+}
+
+/**
+ * Main function to orchestrate the error elimination process.
+ */
+async function nuclearErrorElimination() {
+    console.log(`\n🔥 Initiating Ultra-Advanced Nuclear Error Elimination in ${CONFIG.PROJECT_ROOT} 🔥`);
+    const startTime = Date.now();
+    let overallSuccess = true;
+
+    try {
+        const packageManager = await detectPackageManager();
+
+        // 1. Pre-check and initial diagnostics
+        console.log('\n--- Pre-check Diagnostics ---');
+        const nodeVersion = await executeCommand('node', ['-v'], { silent: true });
+        const npmVersion = await executeCommand('npm', ['-v'], { silent: true });
+        console.log(`Node Version: ${nodeVersion.success ? nodeVersion.stdout.trim() : 'N/A'}`);
+        console.log(`NPM Version: ${npmVersion.success ? npmVersion.stdout.trim() : 'N/A'}`);
+
+        if (!nodeVersion.success || !npmVersion.success) {
+            console.error('Node.js or npm not found in PATH. Please ensure they are installed and accessible.');
+            overallSuccess = false;
+            // Attempt to fix PATH if possible, or advise user
+        }
+
+        // 2. Aggressive Cleanup
+        for (let i = 0; i < CONFIG.MAX_CLEANUP_RETRIES; i++) {
+            const cleanupResult = await performDeepCleanup(packageManager);
+            if (cleanupResult) {
+                console.log('Cleanup phase completed satisfactorily.');
+                break;
+            } else {
+                console.warn(`Cleanup attempt ${i + 1} failed. Retrying...`);
+                if (i === CONFIG.MAX_CLEANUP_RETRIES - 1) {
+                    console.error('Max cleanup retries reached. Some cleanup steps might have failed.');
+                }
+                await delay(CONFIG.INSTALL_RETRY_DELAY_MS);
+            }
+        }
+
+        // 3. Permission Fix (for node_modules and project root)
+        await fixPermissions(CONFIG.PROJECT_ROOT);
+        // Also try fixing global npm permissions if issues persist
+        if (packageManager === CONFIG.NPM_COMMAND && process.platform !== 'win32') {
+            console.log('Attempting to fix global npm directory permissions...');
+            const npmGlobalPathResult = await executeCommand(CONFIG.NPM_COMMAND, ['root', '-g'], { silent: true });
+            if (npmGlobalPathResult.success) {
+                const globalNpmDir = npmGlobalPathResult.stdout.trim();
+                await fixPermissions(globalNpmDir);
+            } else {
+                console.warn('Could not determine global npm root to fix permissions.');
+            }
+        }
+
+
+        // 4. Install Dependencies
+        const installResult = await installDependencies(packageManager);
+        if (!installResult) {
+            console.error('Failed to install core dependencies after multiple attempts.');
+            overallSuccess = false;
+        }
+
+        // 5. Ensure Critical Packages
+        const criticalPackagesResult = await ensureCriticalPackages(packageManager, CONFIG.CRITICAL_PACKAGES_TO_ENSURE);
+        if (!criticalPackagesResult) {
+            console.warn('Not all critical packages could be ensured. Some manual intervention may be required.');
+            overallSuccess = false;
+        }
+
+        // 6. Post-check (e.g., check for common packages)
+        console.log('\n--- Post-check Verification ---');
+        const expressCheck = await executeCommand(packageManager, ['list', 'express', '--depth=0'], {
+            cwd: CONFIG.PROJECT_ROOT,
+            silent: true,
+            timeout: 10000
+        });
+        if (expressCheck.success && expressCheck.stdout.includes('express')) {
+            console.log('Express.js appears to be installed correctly.');
+        } else {
+            console.error('Express.js verification failed. It might still be missing or corrupted.');
+            overallSuccess = false;
+        }
+
+    } catch (error) {
+        console.error('\n!!! A critical error occurred during nuclear error elimination !!!');
+        console.error('Error details:', error);
+        overallSuccess = false;
+    } finally {
+        const endTime = Date.now();
+        const duration = ((endTime - startTime) / 1000 / 60).toFixed(2);
+        console.log(`\n--- Nuclear Error Elimination ${overallSuccess ? 'COMPLETED SUCCESSFULLY' : 'COMPLETED WITH ISSUES'} ---`);
+        console.log(`Total duration: ${duration} minutes.`);
+        if (!overallSuccess) {
+            console.log('Please review the logs above for specific failures and consider manual intervention.');
+        }
+        console.log('🔥 Elimination Process Finished 🔥');
+    }
+}
+
+// Execute the elimination process
+// Set a global timeout for the entire process to prevent infinite loops
+const globalTimeoutId = setTimeout(() => {
+    console.error(`\n!!! Nuclear Error Elimination timed out after ${CONFIG.GLOBAL_TIMEOUT_MS / 1000 / 60} minutes. !!!`);
+    console.error('This indicates a severe, unresolvable issue or an extremely long-running process.');
+    console.error('Please inspect your system manually.');
+    process.exit(1); // Exit with an error code
+}, CONFIG.GLOBAL_TIMEOUT_MS);
+
+// Self-invoking function to start the process
+(async () => {
+    await nuclearErrorElimination();
+    clearTimeout(globalTimeoutId); // Clear global timeout if successful
+    process.exit(0); // Exit cleanly
+})();

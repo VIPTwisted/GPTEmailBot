@@ -1,0 +1,170 @@
+/**
+ * @file elite-command-executor.js
+ * @description An elite-level shell command executor with bulletproof execution,
+ * advanced error handling, retry mechanisms, and robust timeout management.
+ * This module is designed to execute shell commands reliably, even in
+ * challenging environments where commands might get stuck or fail.
+ */
+
+const { spawn } = require('child_process');
+const { promisify } = require('util');
+const path = require('path');
+
+// Convert setTimeout to a promise-based function for easy awaiting
+const delay = promisify(setTimeout);
+
+/**
+ * @typedef {Object} CommandResult
+ * @property {number|null} code - The exit code of the command. Null if timed out or killed.
+ * @property {string} stdout - The standard output from the command.
+ * @property {string} stderr - The standard error output from the command.
+ * @property {boolean} success - True if the command executed successfully (exit code 0).
+ * @property {string} message - A descriptive message about the command's outcome.
+ */
+
+/**
+ * Executes a shell command with advanced error handling, retries, and timeouts.
+ *
+ * @param {string} command - The command to execute (e.g., 'npm install').
+ * @param {string[]} args - An array of arguments for the command.
+ * @param {Object} [options={}] - Options for command execution.
+ * @param {string} [options.cwd=process.cwd()] - The current working directory for the command.
+ * @param {number} [options.timeout=60000] - Timeout in milliseconds for the command. Default: 60 seconds.
+ * @param {number} [options.retries=3] - Number of times to retry the command on failure. Default: 3.
+ * @param {number} [options.retryDelay=1000] - Initial delay between retries in milliseconds. Uses exponential backoff. Default: 1 second.
+ * @param {boolean} [options.silent=false] - If true, suppresses console output for stdout/stderr during execution. Default: false.
+ * @returns {Promise<CommandResult>} A promise that resolves with the command result.
+ */
+async function executeCommand(command, args = [], options = {}) {
+    const {
+        cwd = process.cwd(),
+        timeout = 120000, // 2 minutes
+        retries = 3,
+        retryDelay = 2000, // 2 seconds
+        silent = false,
+        env = process.env // Inherit current environment variables
+    } = options;
+
+    let attempt = 0;
+    while (attempt <= retries) {
+        attempt++;
+        let childProcess;
+        let timer;
+        let stdoutBuffer = '';
+        let stderrBuffer = '';
+
+        try {
+            if (!silent) {
+                console.log(`\nAttempt ${attempt}/${retries + 1}: Executing command: ${command} ${args.join(' ')} (CWD: ${cwd})`);
+            }
+
+            childProcess = spawn(command, args, {
+                cwd,
+                timeout,
+                env, // Pass environment variables
+                shell: true // Execute command inside a shell, useful for complex commands and path resolution
+            });
+
+            // Set a custom timer for cleanup in case childProcess.on('close') isn't triggered promptly
+            timer = setTimeout(() => {
+                if (!childProcess.killed) {
+                    if (!silent) {
+                        console.warn(`Command timed out after ${timeout / 1000}s. Killing process.`);
+                    }
+                    childProcess.kill('SIGTERM'); // Send termination signal
+                    // Give it a moment, then force kill if still alive
+                    setTimeout(() => {
+                        if (!childProcess.killed) {
+                            childProcess.kill('SIGKILL'); // Force kill
+                        }
+                    }, 2000);
+                }
+            }, timeout + 5000); // Add a small buffer to the timeout for graceful termination attempt
+
+            childProcess.stdout.on('data', (data) => {
+                stdoutBuffer += data.toString();
+                if (!silent) {
+                    process.stdout.write(data.toString());
+                }
+            });
+
+            childProcess.stderr.on('data', (data) => {
+                stderrBuffer += data.toString();
+                if (!silent) {
+                    process.stderr.write(data.toString());
+                }
+            });
+
+            const exitCode = await new Promise((resolve, reject) => {
+                childProcess.on('close', (code) => {
+                    clearTimeout(timer);
+                    resolve(code);
+                });
+
+                childProcess.on('error', (err) => {
+                    clearTimeout(timer);
+                    reject(err);
+                });
+            });
+
+            if (exitCode === 0) {
+                if (!silent) {
+                    console.log(`\nCommand "${command}" completed successfully.`);
+                }
+                return {
+                    code: exitCode,
+                    stdout: stdoutBuffer,
+                    stderr: stderrBuffer,
+                    success: true,
+                    message: `Command "${command}" executed successfully.`
+                };
+            } else {
+                const errorMessage = `Command "${command}" failed with exit code ${exitCode}.`;
+                if (!silent) {
+                    console.error(`\n${errorMessage}`);
+                }
+                throw new Error(errorMessage); // Throw to trigger retry logic
+            }
+        } catch (error) {
+            clearTimeout(timer); // Ensure timer is cleared on early error
+            if (childProcess && !childProcess.killed) {
+                childProcess.kill('SIGKILL'); // Ensure process is killed on error
+            }
+
+            if (attempt < retries + 1) {
+                const currentDelay = retryDelay * Math.pow(2, attempt - 1); // Exponential backoff
+                if (!silent) {
+                    console.warn(`Retrying in ${currentDelay / 1000}s... (Error: ${error.message})`);
+                }
+                await delay(currentDelay);
+            } else {
+                // All retries failed
+                const finalErrorMessage = `Command "${command}" failed after ${retries + 1} attempts. Last error: ${error.message}`;
+                if (!silent) {
+                    console.error(`\n${finalErrorMessage}`);
+                    console.error('Final Stdout:\n', stdoutBuffer);
+                    console.error('Final Stderr:\n', stderrBuffer);
+                }
+                return {
+                    code: null, // Indicating a non-clean exit or timeout
+                    stdout: stdoutBuffer,
+                    stderr: stderrBuffer,
+                    success: false,
+                    message: finalErrorMessage
+                };
+            }
+        }
+    }
+    // Should not reach here, but as a fallback
+    return {
+        code: null,
+        stdout: '',
+        stderr: 'Unknown error occurred.',
+        success: false,
+        message: 'Command execution logic reached an unexpected state.'
+    };
+}
+
+module.exports = {
+    executeCommand
+};

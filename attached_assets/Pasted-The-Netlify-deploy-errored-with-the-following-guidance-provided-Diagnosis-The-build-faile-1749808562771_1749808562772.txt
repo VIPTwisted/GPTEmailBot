@@ -1,0 +1,67 @@
+The Netlify deploy errored, with the following guidance provided:
+
+**Diagnosis:**
+The build failed during the stage of installing dependencies with the following error:
+- npm error code EEXIST
+- npm error syscall mkdir
+- npm error path /dev/null
+- npm error errno -17
+- npm error EEXIST: file already exists, mkdir '/dev/null'
+- npm error File exists: /dev/null
+
+**Solution:**
+The error indicates that npm is trying to create a directory `/dev/null` which is a special file on Unix-like systems and should not be used as a directory. To resolve this issue:
+1. Check your project's configuration and scripts to ensure there are no references pointing to `/dev/null` incorrectly.
+2. If there are no specific configurations causing this issue, cleaning the npm cache might help resolve the problem. You can run the following command before the build command in your build script:
+   ```bash
+   npm cache clean --force
+   ```
+3. If the issue persists, investigate your project's dependencies and scripts for any unusual behavior or misconfigurations that might be causing this error.
+
+Verified the package is in package.json or the file was committed to the repo before making changes to the configuration.
+
+The relevant error logs are:
+
+Line 0: build-image version: 235a96ed6c11cbdf942eed7e70e6802956f9b464 (noble)
+Line 1: buildbot version: d044b0a4e24e687c7e46ced406409d62669bccab
+Line 2: Fetching cached dependencies
+Line 3: Failed to fetch cache, continuing with build
+Line 4: Starting to prepare the repo for build
+Line 5: No cached dependencies found. Cloning fresh repo
+Line 6: git clone --filter=blob:none https://github.com/VIPTwisted/ToyParty
+Line 7: Preparing Git Reference refs/heads/main
+Line 8: Custom publish path detected. Proceeding with the specified path: 'dist'
+Line 9: Custom build command detected. Proceeding with the specified command: 'npm ci && npm run build'
+Line 10: Starting to install dependencies
+Line 11: Python version set to 3.13.3
+Line 12: Ruby version set to 3.4.3
+Line 13: Go version set to 1.24.3
+Line 14: Using PHP version 8.3
+Line 15: Downloading and installing node v20.19.2...
+Line 16: Downloading https://nodejs.org/dist/v20.19.2/node-v20.19.2-linux-x64.tar.xz...
+Line 17: Computing checksum with sha256sum
+Line 18: Checksums matched!
+Line 19: Failed during stage 'Install dependencies': dependency_installation script returned non-zero exit code: 1
+Line 20: Now using node v20.19.2 (npm v10.8.2)
+Line 21: Enabling Node.js Corepack
+Line 22: Started restoring cached build plugins
+Line 23: Finished restoring cached build plugins
+Line 24: WARNING: The environment variable 'NODE_ENV' is set to 'production'. Any 'devDependencies' in package.json will not be installed
+Line 25: Started restoring cached corepack dependencies
+Line 26: Finished restoring cached corepack dependencies
+Line 27: No npm workspaces detected
+Line 28: Started restoring cached node modules
+Line 29: Finished restoring cached node modules
+Line 30: Installing npm packages using npm version 10.8.2
+Line 31: npm error code EEXIST
+Line 32: npm error syscall mkdir
+Line 33: npm error path /dev/null
+Line 34: npm error errno -17
+Line 35: npm error EEXIST: file already exists, mkdir '/dev/null'
+Line 36: npm error File exists: /dev/null
+Line 37: npm error Remove the existing file and try again, or run npm
+Line 38: npm error with --force to overwrite files recklessly.
+Line 39: npm error A complete log of this run can be found in: /opt/buildhome/.npm/_logs/2025-06-13T09_54_04_389Z-debug-0.log
+Line 40: Error during npm install
+Line 41: Failing build: Failed to install dependencies
+Line 42: Finished processing build request in 6.845s

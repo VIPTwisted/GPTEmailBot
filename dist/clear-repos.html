@@ -1,0 +1,157 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clear Failed Repos</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        .button-container {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .clear-btn {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+        }
+        .clear-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 107, 107, 0.6);
+        }
+        .clear-btn:active {
+            transform: translateY(0);
+        }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .success {
+            background: rgba(76, 175, 80, 0.3);
+            border: 1px solid #4caf50;
+        }
+        .error {
+            background: rgba(244, 67, 54, 0.3);
+            border: 1px solid #f44336;
+        }
+        .info {
+            background: rgba(33, 150, 243, 0.3);
+            border: 1px solid #2196f3;
+            margin-bottom: 20px;
+        }
+        .back-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 10px 20px;
+            border-radius: 25px;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 20px;
+            transition: all 0.3s ease;
+        }
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧹 Clear Failed Repos</h1>
+        
+        <div class="info">
+            <strong>ℹ️ Info:</strong> This will clear all previously failed repositories from the logs, allowing them to be attempted again on the next sync.
+        </div>
+        
+        <div class="button-container">
+            <button class="clear-btn" onclick="clearFailedRepos()">
+                🧹 Clear Failed Repositories
+            </button>
+        </div>
+        
+        <div id="status"></div>
+        
+        <div style="text-align: center;">
+            <a href="/" class="back-btn">← Back to Main</a>
+        </div>
+    </div>
+
+    <script>
+        async function clearFailedRepos() {
+            const statusDiv = document.getElementById('status');
+            const button = document.querySelector('.clear-btn');
+            
+            // Show loading state
+            button.disabled = true;
+            button.innerHTML = '🔄 Clearing...';
+            statusDiv.innerHTML = '<div class="info">🔄 Clearing failed repositories...</div>';
+            
+            try {
+                const response = await fetch('/clear-failed-repos');
+                const result = await response.json();
+                
+                if (result.success) {
+                    statusDiv.innerHTML = '<div class="success">✅ Failed repositories cleared successfully!</div>';
+                } else {
+                    statusDiv.innerHTML = `<div class="error">❌ Error: ${result.error}</div>`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="error">❌ Network error: ${error.message}</div>`;
+            } finally {
+                // Reset button
+                button.disabled = false;
+                button.innerHTML = '🧹 Clear Failed Repositories';
+            }
+        }sDiv.innerHTML = '<div class="success">✅ ' + result.message + '</div>';
+                    button.innerHTML = '✅ Cleared Successfully!';
+                    
+                    // Reset button after 3 seconds
+                    setTimeout(() => {
+                        button.disabled = false;
+                        button.innerHTML = '🧹 Clear Failed Repositories';
+                    }, 3000);
+                } else {
+                    statusDiv.innerHTML = '<div class="error">❌ Error: ' + result.message + '</div>';
+                    button.disabled = false;
+                    button.innerHTML = '🧹 Clear Failed Repositories';
+                }
+            } catch (error) {
+                statusDiv.innerHTML = '<div class="error">❌ Network error: ' + error.message + '</div>';
+                button.disabled = false;
+                button.innerHTML = '🧹 Clear Failed Repositories';
+            }
+        }
+    </script>
+</body>
+</html>
