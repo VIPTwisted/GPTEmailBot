@@ -1,0 +1,125 @@
+
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Gemini OS API",
+    "version": "1.0.0",
+    "description": "Complete API documentation for Gemini OS - Webhook Sync, Multilingual GPT, and Tier Management"
+  },
+  "servers": [
+    {
+      "url": "/.netlify/functions",
+      "description": "Netlify Functions"
+    }
+  ],
+  "paths": {
+    "/integrations/webhook-dispatch": {
+      "post": {
+        "summary": "Dispatch webhook events",
+        "tags": ["Webhooks"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "eventType": {
+                    "type": "string",
+                    "enum": ["rep-joined", "course-completed", "ai-alert"]
+                  },
+                  "payload": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook dispatched successfully"
+          }
+        }
+      }
+    },
+    "/gpt/multilang-agent": {
+      "post": {
+        "summary": "Execute multilingual GPT agent",
+        "tags": ["GPT"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "prompt": {
+                    "type": "string"
+                  },
+                  "lang": {
+                    "type": "string",
+                    "enum": ["en", "es", "fr", "de"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "GPT response generated"
+          }
+        }
+      }
+    },
+    "/gpt/gate-agent": {
+      "post": {
+        "summary": "Execute tiered GPT agent",
+        "tags": ["GPT"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "prompt": {
+                    "type": "string"
+                  },
+                  "userId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tiered GPT response"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "WebhookEvent": {
+        "type": "object",
+        "properties": {
+          "eventType": {
+            "type": "string"
+          },
+          "payload": {
+            "type": "object"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    }
+  }
+}

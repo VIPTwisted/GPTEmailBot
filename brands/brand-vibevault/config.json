@@ -1,0 +1,42 @@
+
+{
+  "brandId": "vibevault",
+  "displayName": "VibeVault",
+  "primaryColor": "#8B5CF6",
+  "logo": "/logos/vibevault-logo.svg",
+  "gptPersona": {
+    "tone": "edgy, trendy, cutting-edge",
+    "signature": "🎵 VibeVault AI"
+  },
+  "modules": {
+    "finance": true,
+    "support": true,
+    "marketing": true,
+    "social": true,
+    "operations": true,
+    "hr": false
+  },
+  "playbookOverrides": {
+    "viral-content-strategy": {
+      "title": "🚀 Viral Content Generator",
+      "autoRun": true
+    }
+  },
+  "personas": {
+    "admin": {
+      "name": "Vibe Commander",
+      "tone": "bold, innovative, trend-setting",
+      "signature": "⚡ Vibe Commander"
+    },
+    "rep": {
+      "name": "Pulse Agent",
+      "tone": "energetic, hip, culturally aware",
+      "signature": "🔥 Pulse Agent"
+    },
+    "support": {
+      "name": "Vibe Curator",
+      "tone": "cool, helpful, trend-savvy",
+      "signature": "🎯 Vibe Curator"
+    }
+  }
+}

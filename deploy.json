@@ -1,0 +1,47 @@
+
+{
+  "repos": [
+    {
+      "repo_owner": "VIPTwisted",
+      "repo_name": "ToyParty",
+      "branch": "main",
+      "username": "VIPTwisted",
+      "gpt_id": "ToyParty",
+      "aliases": ["toy", "party", "gpt-toy-party", "toyparty"]
+    },
+    {
+      "repo_owner": "VIPTwisted",
+      "repo_name": "GPTEmailBot",
+      "branch": "main", 
+      "username": "VIPTwisted",
+      "gpt_id": "EmailBot",
+      "aliases": ["email", "bot", "gpt-email-bot", "emailbot"]
+    },
+    {
+      "repo_owner": "VIPTwisted",
+      "repo_name": "GPTDataProcessor",
+      "branch": "main",
+      "username": "VIPTwisted", 
+      "gpt_id": "DataProcessor",
+      "aliases": ["data", "processor", "gpt-data-processor", "dataprocessor"]
+    },
+    {
+      "repo_owner": "VIPTwisted",
+      "repo_name": "GPTAnalytics",
+      "branch": "main",
+      "username": "VIPTwisted",
+      "gpt_id": "Analytics",
+      "aliases": ["analytics", "gpt-analytics"]
+    },
+    {
+      "repo_owner": "VIPTwisted", 
+      "repo_name": "GPTChatBot",
+      "branch": "main",
+      "username": "VIPTwisted",
+      "gpt_id": "ChatBot",
+      "aliases": ["chat", "chatbot", "gpt-chat-bot"]
+    }
+  ],
+  "default_repo": "ToyParty",
+  "auto_create_repos": true
+}

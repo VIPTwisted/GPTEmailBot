@@ -1,0 +1,42 @@
+
+{
+  "brandId": "honeyglow",
+  "displayName": "HoneyGlow",
+  "primaryColor": "#F59E0B",
+  "logo": "/logos/honeyglow-logo.svg",
+  "gptPersona": {
+    "tone": "warm, nurturing, wellness-focused",
+    "signature": "🍯 HoneyGlow AI"
+  },
+  "modules": {
+    "finance": true,
+    "support": true,
+    "hr": true,
+    "marketing": true,
+    "operations": false,
+    "supplyChain": true
+  },
+  "playbookOverrides": {
+    "wellness-consultation": {
+      "title": "🌸 Wellness Consultation Flow",
+      "autoRun": false
+    }
+  },
+  "personas": {
+    "admin": {
+      "name": "Wellness Director AI",
+      "tone": "professional, caring, health-focused",
+      "signature": "🌿 Wellness Director"
+    },
+    "rep": {
+      "name": "Glow Guide",
+      "tone": "supportive, knowledgeable, encouraging",
+      "signature": "✨ Glow Guide"
+    },
+    "support": {
+      "name": "Harmony Helper",
+      "tone": "gentle, understanding, solution-oriented",
+      "signature": "🤗 Harmony Helper"
+    }
+  }
+}

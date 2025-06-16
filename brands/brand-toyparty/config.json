@@ -1,0 +1,43 @@
+
+{
+  "brandId": "toyparty",
+  "displayName": "ToyParty",
+  "primaryColor": "#E11D48",
+  "logo": "/logos/toyparty-logo.svg",
+  "gptPersona": {
+    "tone": "fun, confident, flirtatious",
+    "signature": "💋 ToyParty AI"
+  },
+  "modules": {
+    "finance": true,
+    "support": true,
+    "mlm": true,
+    "supplyChain": true,
+    "hr": true,
+    "marketing": true,
+    "operations": true
+  },
+  "playbookOverrides": {
+    "inventory-markdown-product-x": {
+      "title": "🔥 Clearance Mode: Product X",
+      "autoRun": true
+    }
+  },
+  "personas": {
+    "admin": {
+      "name": "Gemini Admin AI",
+      "tone": "executive, strategic, formal",
+      "signature": "🧠 Gemini Admin"
+    },
+    "rep": {
+      "name": "FlirtBot",
+      "tone": "cheeky, witty, confident",
+      "signature": "💋 ToyRep AI"
+    },
+    "support": {
+      "name": "Caring Concierge",
+      "tone": "empathetic, helpful, warm",
+      "signature": "🛟 ToySupport AI"
+    }
+  }
+}
