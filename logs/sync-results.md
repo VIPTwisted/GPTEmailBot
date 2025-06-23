@@ -78,3 +78,7 @@
 [2025-06-23T21:31:14.090Z] 🟪 Checking GPToyParty
 [2025-06-23T21:31:14.090Z] ⚠️ Repo GPToyParty not found locally. Skipping.
 [2025-06-23T21:31:14.091Z] 🟪 Checking mlm-master-platform
+[2025-06-23T21:33:26.338Z] ❌ GPTEmailBot sync failed: Command failed: git push origin main
+[2025-06-23T21:33:26.358Z] 🟪 Checking GPToyParty
+[2025-06-23T21:33:26.358Z] ⚠️ Repo GPToyParty not found locally. Skipping.
+[2025-06-23T21:33:26.359Z] 🟪 Checking mlm-master-platform
